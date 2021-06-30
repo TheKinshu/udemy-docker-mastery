@@ -1,0 +1,1101 @@
+Glossary:
+    CLI - Command Line Interface
+Command:
+    docker version
+        - verified cli can talk to engine
+    docker info
+        - most config vales of engine
+    docker (command line structure)
+        - old (still works): docker <command> (options)
+        - new: docker <command> <sub-command> (options)
+        Example:
+            docker run <-- old
+            docker container run <-- new
+
+Images vs. Container
+    - An image is the application we want to run
+    - A Container is an instance of that image running as a process
+    - You can have many containers running off the same image
+    - Docker's default image "registry" is called Docker Hub (hub.docker.com)
+
+docker container run --publish 80:80 nginx
+    1. looks for an image called nginx
+    2. pulls the latest image from the Docker Hub
+    3. starts a new process and container from that image for us to use
+    4. publish (option) openes the port 80 of the host IP
+    5. routes all the traffic to the container IP, port 80/nginx default to port 80
+
+docker container run <container id/name>
+    - docker always starts a new container
+    - to use a existing one use docker container start
+
+docker container stop <container id/name>
+    - stop the process of the container
+
+docker container ls (-a)
+    - list all the active container
+    - (-a) option will list all the container that has been generated
+
+docker container top
+    - list running processes in specific container
+
+docker container rm <container id/name>
+    - remove(s) container except active one
+    - (-f) option allow you to force close the container and remove it
+    - another option is simply just stop the container
+
+What happens in the background of 'docker container run'?
+    1. Looks for that image locally in image cache, if doesn't exist
+    2. Then looks in remote image repository (defaults to Docker Hub)
+    3. Downloads the latest version (nginx:latest version is by default)
+    4. Starts a new container base on that image (doesn't make a new copy of the image)
+    5. Customize the networking, distribute specific virtual ip thats inside of the docker virtual network
+    6. Opens up the specified port (ex. 80) on host and forwards all the traffic to the port 80 of the container
+    7. Starts container by using the CMD in the image Dockerfile
+
+Containers aren't Mini-VM's
+    - They are just processes
+    - Limited to what resources they can access
+    - Exit when process stops
+
+Assignment: Manage Multiple Containers:
+    docs.docker.com and --help are your friend
+    Run a nginx, mysql and a httpd (apache) server
+    Run all of them --detach (or -d), name them with --name
+    nginx should listen on 80:80, httpd on 8080:80, mysql on 3306:3306
+    When running mysql, use the --env option (or -e) to pass in MYSQL_RANDOM_ROOT_PASSWORD=yes
+    Use docker container logs on mysql to find the random password it created on startup
+    Clean it all up with docker container stop and docker container rm (both can accept multiple names or ID's)
+    Use docker container ls to ensure everything is correct before and after cleanup
+
+
+docker container stats 
+    - show live performance data for all container
+
+docker container run -it
+    - start new container interactivly
+
+docker container exec -it
+    - run additional command in existing container
+
+-i interactive
+    - Keep session open to receive terminal input
+
+-t pseudo-tty
+    - simulates a real terminal, like what ssh does
+
+bash shell
+    - if run with -it, it will give you a terminal inside the running container
+
+Ubuntu image
+    - Its default CMD is bash
+    - This container has a very minimum install compare to the actual version
+
+Alpine Linux
+    - A small security-focused distribution
+    - Its so small that it doesn't have bash but instead uses sh
+        : docker container run -it alpine sh
+
+Docker Networks defaults
+    - Each container connected to a private virtual network "bridge"
+    - Each virtual network routes through NAT firewall on host IP
+    - All containers on a virtual network can talk to each other without -p
+    - Best practice is to create a new virtual network for each app:
+        - network "my_web_app" for mysql and php/apache containers
+        - network "my_api" for mongo and nodejs containers
+
+    - Batteries Included, But Removable
+        - Defaults work well in many cases, but easy to swap out parts to customize it
+    - Make new virtual networks
+    - Attach containers to more than one virtual network (or none)
+    - Skipo virtual networks and use host IP (--net=host)
+    - Use different Docker network drivers to gain new abilities
+
+--format
+    A common option for formatting the output of commands using "Go template"
+
+docker container inspect --format '{{ .NetworkSettings.IPAddress }}' webhost
+
+Docker Networks: CLI Management
+    show networks: docker network ls
+    inspect a network: docker network inspect
+    create a network: docker network create --driver
+    attach a network to container: docker network connect
+    detach a netowkr from container docker network disconnect
+
+--network bridge
+    Default Docker virtual network, which is NAT'ed behind the Host IP
+
+--network host
+    It gains performance by skipping virtual networks but sacrifices security of container model
+
+network driver
+    Bult-in or 3rd party extensions that give you birtual network features
+
+docker container run -d --name new_nginx --network my_app_net nginx
+
+docker network connect
+    Dynamically creates a NIC in a container on an existing virtual network
+
+docker network connect c3f2155fbf72 435a7dda3599
+    c3f2155fbf72: The new network of id
+    435a7dda3599: The id of the container
+
+Docker Networks: Default security
+    Create your apps so frontend/backend sit on same Docker network
+    Their inter-communication never leaves host
+    All externally exposed ports closed by default
+    You must manually expose via -p, which is better default security!
+    This gets even better later with Swarm and Overlay networks
+
+Docker Networks: DNS
+    - Containers shouldn't rely on IP's for inter-communication
+    - DNS for friendly names is built-in if you use customize networks
+    - This gets way easier with Docker Compose
+
+Assignment: CLI App Testing
+    - Use different Linux distro containers to check curl cli tool version
+    - Use two different terminal windows to start in both centos:7 and ubuntu:14.04, using -it
+    - Learn the docker container --rmm option so you can save cleanup
+    - Ensure curl is installed and on latest version for that distro
+        : ubuntu: apt-get update && apt-get install curl
+        : centos: yum update curl
+    - Check curl --version
+
+--rm removes the container after exit
+
+Assignment: DNS Round Robin Test
+    - Create a new virtual network (default bridge driver)
+    - Create a two container from elasticsearch:2 image
+    - Research and use -network-alias search when creating them to give them an additional DNS name to respond to
+    - Run alpine nslookup search with --net to see the two containers list for the same DNS name
+    - Run centos curl -s search:9200 with --net multiple times until you see both "name fields show
+
+Answer:
+docker network create robin
+docker container run -d --net robin --net-alias search elasticsearch:2
+docker container run --rm --net robin alpine nslookup search
+docker container run --rm --net robin centos
+
+What's In An Image?
+    - Application binaries and dpendencies
+    - Metadata about the image data and how tyo run the image
+    Offical definition: An Image is an ordered collection of root filesystem changes and the corresponding 
+                        execution parameters for use within a container runtime.
+    - Not a complete OS. No Kernel, kernel modules (ex. drivers)
+    - Image is not really an OS more so just starting an application
+    - Small as one file (your app binary) like golang static binary
+    - Big as an Ubuntu distro with apt, and Apache, PHP, and more installed
+
+
+docker pull nginx:<version number>
+    Update or download a specific version of the image wanted
+
+Images Layer:
+    docker history nginx:latest
+        - Shows what was added to the image
+
+Copy on write
+    - copy from the image and save changes into container
+
+docker image inspect nginx
+    - This is the meta data about the image
+
+Images Tag:
+    - All about Tags
+    - How to upload to docker hub
+    - Image ID vs Tag
+
+docker image tag --help
+    - image has no name
+    - only official repositories has the right to use their name as root otherwise an account name will be beside the repositories
+    - Tag is a specific commit/Label that points to a specific version of the image ex. (8.0.0, mainline, latest)
+
+docker image tag nginx kinshu/nginx
+    - doing so will rename the existing tag to the one specified
+    - docker image tag <source tag name> <new tag name>
+
+docker image push kinshu/nginx:<tag name optional>
+    - similiar to git push you push the file to your repository on Docker Hub
+    - if tag is not specified it will default to "latest"
+    - if you want the image to be private it is best to create the repository first in private beforehand
+
+docker image build -t customnginx .
+    - (-t) is for tagging the build, in this case customnginx is the tag name
+    - (.) this mean build the docker image file in the current directory
+    - when building a file docker will check cache to see if existing data has already been cache
+      and uses it to create the new file without rebuilding the whole image
+
+    When creating a Dockerfile put the less changing part of the code on the top and things that changes the most at the bottom.
+
+
+Assignment 1: Answer
+    FROM node:6-alpine
+
+    EXPOSE 3000
+
+    RUN apk add --update tini
+
+    RUN mkdir -p /usr/src/app
+
+    WORKDIR /usr/src/app
+
+    COPY package.json package.json
+
+    RUN npm install && npm cache clean --force
+
+    COPY . .
+
+    CMD ["/sbin/tini", "--", "node", "./bin/www"]
+    ---------------------------------------------
+    docker build -t testnode .
+
+    docker container run --rm -p 80:3000 -d testnode
+
+
+docker system df   
+    - display how much space each of the following things are taking up
+
+docker system prune (-a)
+    - delete everything that are dangling or in-active that are cache and unuse network
+    - (-a) will delete everything including unuse/in-active images
+
+
+Container Lifetime & Persistent data
+    - Containers are usually immutaable and ephemeral
+    - "immutable infrastructure": only re-deploy containers, never change
+    - This is the ideal scenario but what about databases or unique data?
+    - Docker gives us features to ensure these "separation of concerns"
+    Volumes and Bind Mounts:
+        Volumes
+            - make special location outside of containers UFS
+        Bind Mounts:
+            - link container path to host path
+Persistent Data: Volumes
+    Volume command in Dockerfile
+    - Volume need manual deletion, cannot be removed by just deleting the container itself
+    - "Volume Data" are suppose to be more imporant than the container itself
+    
+    docker container run -d --name mysql -e MYSQL_RANDOM_ROOT_PASSWORD=true mysql
+    (docker container run -d --name mysql -e MYSQL_RANDOM_ROOT_PASSWORD=True -v mysql-db:/var/lib/mysql mysql)
+        -v specify a new volume you want to create or name volume
+
+    docker volume create --
+        required to do this before "docker run" to use custome driver and labels
+
+Persistent Data: Bind Mounting
+    - Maps a host file or directory to a container file or directory
+    - Basically just two locations pointing to the same file(s)
+    - Again, skips UFS, and host files overwrite any in container
+    - Can't user in Docerfile, must be at container run
+    - ... run -v /Users/bret/stuff:/path/container (mac/linux)
+    - ... run -v //c/Users/bret/stuff:/path/container (windows)
+
+    docker container run -d --name nginx -p 80:80 -v ${pwd}:/usr/share/nginx/html nginx
+
+Docker Compose:
+    - Configure relationships between containers
+    - save our docker container run settings in easy to read file
+    - create one-liner developer enviroment startups
+    - comprised of 2 separate but related things
+    - 1. YAML-formatted file that describes our solution options for:
+        - containers
+        - networks
+        - volume
+    - 2. A CLI tool docker-compose used for local dev/test automation with those YAML files
+
+docker-compose.yml
+    - compose YAML format has it's own version: 1, 2, 2.1, 3, 3.1
+    - YAML file can be used with docker-compose command for local docker automation or
+    - with docker directly in production with Swarm
+    - docker-compose --help
+    - docker-compose.yml is default filename, but any can be used with docker-compose -f
+
+docker-compose cli
+    - not a production-grade tool but ideal for local development and test
+    - Two most common commands are
+        - docker-compose up # setup volumes/netowkrs and start all containers
+        - docker-compose down # stop all containers and remove cont/vol/net
+
+Using Compose to build
+    - compose can also build your custom images
+    - will build them with docker-compose up if not found in cache
+    - also rebuild with docker-compose build
+    - great for complex builds that have lots of vars or build args
+
+Swarm mode: Built-in Orchestration
+    - swarm mode is a clustering solution built inside docker
+    - not related to swarm "classic" pre-1.12 versions
+    - not enabled by default, new commands once enabled
+        - docker swarm
+        - docker node
+        - docker service
+        - docker stack
+        - docker secret
+Swarm Control plane:
+    - manager node
+        - they keep a copy of the database
+        - encrypt the data so that they can manage the swarm
+        - act as a vm or a physical host
+        - a worker that has permssion to control the swarm
+    - worker node
+    - worker and manager nodes can be promoted or demoted
+    - manager nodes service allows for more than 1 task to be done by giving worker a replica to different workers
+    - there can only be 1 leader at a time of all manager
+
+Docker Service create:
+    Manager Node:
+        API - Accepts command from client and creates service object
+        Orchestrator - Reconciliation loop for service objects and creates tasks
+        Allocator - Allocates IP addresses to tasks
+        Scheduler - Assigns nodes to tasks
+        Dispatcher - Checks in on workers
+    Worker Node:
+        Worker -  Connects to dispatcher to check on assigned tasks
+        Executor - Executes the tasks assigned to worker node
+    
+Docker swarm init
+    - Lots of PKI and security automation
+        - Root signing certificate created for our swarm
+        - certificate is issued for first manager node
+        - join tokens are created
+    - Raft database created to store root CA, configs and secrets
+        - Encrypted by default on disk
+        - No need for anoyher key/value system to hold orchestation/secrets
+        - Replicates logs amongst Managers via mutual TLS in "control plane"
+        - Ensure consistency across multiple nodes (best for cloud service as theres no way to check)
+
+docker service create alpine ping 8.8.8.8
+    - creates a task that is given to an alpine container to ping a google service
+
+docker service update <service ID> --replicas 3
+    - tells the service to create up to 3 replicas and give it to 2 additional container 
+
+docker service ps <service id or name>
+    - display all the service info that is running and the state it is currently in.
+
+docker orchestation system:
+    - if a node/worker is removed or shutdown(failed task) the service/manager node will quickly create a new container to replace it
+    - to remove the container you must remove the service first
+
+docker service rm <name or id>
+    - removes the service then removes the container
+
+Overlay Multi-Host networking
+    - Just choose --driver overlay when creating network
+    - For container-to-container traffic inside a single swarm
+    - optional IPSec (AES) encryption on network creation
+    - Each service can be connected to multiple networks
+        = eg. front-end, back-end
+Ex.
+    // Creating a network
+    - docker network create --driver overlay mydrupal
+    // Create the database
+    - docker service create --name psql --network mydrupal -e POSTGRES_PASSWORD=mypass postgres
+    - docker service create --name drupal --network mydrupal -p 80:80 drupal
+
+Routing Mesh
+    - Routes ingress (incoming) packets for service to proper task
+        - 
+    - spans all nodes in swarm
+    = Uses IPVS from linux kernel
+    - load balances swarm services across their tasks 
+    - two way this works:
+        - container-to-container in a overlay network( uses VIP)
+            - distribute all the task in the service to different nodes
+        - external traffic incoming to published port (all nodes listen)
+            - can be accessible on different nodes
+
+    - This is stateless load balancing
+        - has a high chance of giving you different result when using
+    - This LB(Load balance) is at OSI layer 3 (TCP), not Layer 4 (DNS)
+    - Both limitation can be overcome with:
+        - Nginx or HAProxy LB proxy, or :
+        - Docker Enterprise Edition, which comes with built-in L4 web proxy
+
+VIP vs Round robin
+    - App storing information in cache doesn't allow proper distribution of the load
+    - VIP can access the information and deliver do any of the node instead
+
+Stacks: Production Grade Compose
+    - In 1.13 Docker adds a new layer ob abstraction to Swarm called Stacks
+    - Stacks accept Compose files as their declarative definition for services, netwroks and volumes
+    - We use docker stack deploy rather then docker service create
+    - Stacks manages all those objects for us, including overlay network per stack. Adds stack name to start of their name
+    - New deploy: key in compose file. Can't do build:
+        - build: should never be in production
+    - Compose now ignores deploy:, Swarm ignores build:
+    - docker-compose cli not needed on Swarm server
+    - All app name will be infront of any of the network created eg.(voteapp_backend)
+
+Stack yml:
+    - Must be version 3 or higher
+
+docker stack deploy -c example-voting-app-stack.yml voteapp
+    - Creating all the networks and services that are required to run the application using a yaml file
+    - If stack have already deployed it will update any changes in the yml file instead
+
+docker stack services voteapp
+    - Shows you how many replicas has been created
+
+docker stack ps voteapp
+    - Shows which service is on which node
+
+docker visualizer
+
+Secrets Storage
+    - Easiest "secure" solution for storing secrets in swarm
+        - design to be encrypted on disk only available in place it needs to be
+    - built-in in swarm
+    - What is a Secret?
+        - Usernames and paswords
+        - TLS certificates and keys
+        - SSH keys
+        - Any data you would prefer not be "on front page of news"
+    - Supports generic strings or binary content up to 500kb in size
+    - Doesn't require apps to be rewritten
+    - Only stored on disk on manager nodes
+    - default is managers and workers "control plane" is TLS + Mutual Auth
+    - Secrets are first stored in Swarm, then assigned to a Service(s)
+    - Only containers in assigned Service(s) can see them
+    - They look like files in container but are actually in-memory fs
+    example: /run/secrets/<secret_name>
+    - docker-compose can use file-based secrets, but fakes the security
+
+docker secret create psql_user psql_user.txt
+
+echo "myDBpassWORD" | docker secret create psql_pass - 
+    - The dash in the end mean read the command in a standard input
+
+Drawbacks with both methods:
+    - Storing password on host
+        - fix: pass in file using remote API
+    - In the history of our bash file
+
+docker service create --name psql --secret psql_user --secret psql_pass -e POSTGRES_PASSWORD_FILE=/run/secrets/psql_pass -e POSTGRES_USER_FILE=/run/secrets/psql_user postgres
+
+docer-compose file to use stack and secrets:
+    - must be version 3.1 or higher
+
+docker stack deploy -c docker-compose.yml myDBpassWORD
+docker stack rm mydb
+    - will remove anything that can was created with it without remove it one by one
+
+Full App Lifecycle with Compose
+ - Live the Dream!
+ - Single set Compose files for:
+ - local docker-compose up development environment
+ - remote docker-compose up ci environment
+ - remote docker stack deploy production
+
+When using docker-compose up
+    - use docker-compose.yml first
+    - overlay the docker-compose.override.yml on that of it
+    CI Solution:
+        - docker-compose -f docker-compose.yml -f docker-compose.test.yml up -d
+        - no bind-mount because it not meant to save data
+        - docker-compose -f docker-compose.yml -f docker-compose.prod.yml config
+            - looks at both file and push them together as a single compose file equivlent
+        - docker-compose -f docker-compose.yml -f docker-compose.prod.yml config > output.yml
+            - this is what you would use to update in production
+    
+Service Updates
+    - Provides rolling replacement of tasks/containers in a service
+    - Limits downtime (be careful with "prevents" downtime)
+    - Will replace containers for most changes
+    - Has many, many cli options to control the update
+    - Create options will usually change, adding -add or -rm to them
+    - Includes rollback and healthcheck options
+    - Also has scale & rollback subcommand for quicker access
+        - docker service scale web=4 and docker service rollback web
+    - A stack deploy, when pre-existing, will issue service update
+
+Swarm Update Examples
+    - just update the image used to a newer version
+        -docker service update --image myapp:1.2.1 <servicename>
+    - Adding an environmnet variable and remove a port
+        - docker service update --env-add NODE_ENV=production --publish-rm 8080
+    - Change number of replicas of two services
+        - docker service scale web=8 api=6
+
+Swarm updates in stack files
+    - same command. just edit the yml file
+
+If you see the nodes work load is not balance you can force update to rebalance
+    - docker service update --force web
+    - Help get rid of uneven work load for nodes
+
+Docker Healthchecks
+    - HEALTHCHECK was added in 1.12
+    - Supported in Dockerfile, Compose YAML, docker run, and swarm services
+    - Docker engine will exec's the command in the container
+        - (e.g. curl localhost)
+    - It expects exit 0 (ok) or exit 1 (error)
+    - Three container states: starting, healthy, unhealthy
+    - Much better then " is binary still running?"
+    - Not an external monitoring replcament
+    - healthcheck status shows up in docker container ls
+    - check last 5 healthchecks with docker container inspect
+    - Docker run does nothing with Healthchecks
+    - Services will replace tasks if they fail healthcheck
+    - Service updates wait for them before continuing
+
+Healthcheck Docker Run Example:
+    docker run \
+        --health-cmd="curl -f localhost:9200/_cluster/heath || false" \
+        --health-interval=5s \ 
+        --health-retries=3 \
+        --health-timeout=2s \
+        --health-start-period=15s \
+        elasticsearch:2
+    
+    docker files:
+        Options for healthcheck command
+            --interval=DURATION(defaults 30s) // How often it will run a healthcheck
+            --timeout=DURATION(defaults 30s) // How long it will wait to error out
+            --start-period=DURATION(default 0s)(17.09+) // Will wait and see until the fill start period duration is over 
+            --retries=N (default: 3)
+        Basic command using default options
+            - HEALTHCHECK curl -f http://localhost/ || false
+        Custom options with the command
+            - HEALTHCHECK --timeout=2s --interval=3s --retries=3 \
+                CMD curl -f http://localhost/ || exit 1
+    
+    Healthcheck in nginx Dockerfile
+        Static website running in Nginx, just test default URL
+
+        FROM nginx:1.13
+
+        HEALTHCHECK --interval=30s --timeout=3s \
+            CMD curl -f http://localhost/ || exit 1
+    
+    Healthcheck in PHP Nginx Dockerfile
+        PHP-FPM running behind Nginx, test the Nginx and FPM status URLs
+
+        FROM your-nginx-php-fpm-combo-image
+
+    Healthcheck in Compose/stack files
+        - version 2.1 minimum
+        - start_period minimum version 3.4
+
+Container Registries
+    - An image registry needs to be part of your container plan
+    - More Docker Hub details including auto-build
+    - How Docker Store (store.docker.com) is different then hub
+    - How Docker Cloud (cloud.docker.com) is different then hub 
+    - Use new swarm feature in Cloud to conntect Mac/Win to swarm
+    - Install and use Docjer Registry as private image store
+    - 3rd Party Registry options
+
+Docker Hub: Digging Deeper
+    - the Most popular public image registry
+    - its really Docker registry plus lightweight image building
+    - link github/bitbucket together
+
+Running Docker Registry
+    - A private image registry for your network
+    - Part of the docker/distribution Github Repo
+    - The de facto in private container Registries
+    - Not as full featured as Hub or others, no web UI. basic auth only
+    - At its core: a web API and storage system, written in golang
+    - Storage support local, S3/Azure/Alibaba/Google Cloud, and OpenStack Swift
+
+Run a Private Docker Registry
+    - Run the registry image on default port 5000
+    - Re-tag an existing image and push it to your new registry
+    - Remove that image from local cache and pull it from new registry
+    - Re-create registry using a bind mount and see how it stores data
+
+Registry and Proper TLS
+    - "Secure by Default": Docker won't talk to registry without HTTPS
+    - Except, localhost(127.0.0.0/8)
+    - For remote self-signed TLS, enable "insecure-registry" in engine
+
+Example:
+    
+    docker run hello-world
+    docker tag hello-world 127.0.0.1:5000/hello-world
+    docker push 127.0.0.1:5000/hello-world # This saves it into local cache
+
+    docker pull 127.0.0.1:5000/hello-world
+
+    docker container kill registry
+
+Private Docker Registry with Swarm
+    - Works the same way as localhost
+    - Because of Routing Mesh, all nodes can see 127.0.0.1:5000
+    - Remember to decide how to store images (volume driver)
+    Notes: all nodes must be able to access images
+    = ProTip: Use a hosted SaaS registry if possible (try not to use your own registry)
+
+Limit Your Simultaneous Innovation
+    - Many initial container projects are too big in scope
+    - Solutions you maybe don't need day one:
+        - Fully automatic CI/CD
+        - Dynamic performance scaling
+        - Containerizing all or nothing
+        - Starting with persistent data
+            - dont put your database into the container first
+
+Legacy Apps Work in Containers too
+    - Microservice conversion isn't required
+    - 12 Factor is a horizon we're always chasing
+
+What to Focus on First: Dockerfiles
+    - More imprant than fancy Orchestration
+    - Its your new build environment
+    - Study Dockerfile/ENTRY of Hub officials
+    - FROM Official distros that are most familiar
+
+Dockerfile Maturity model
+    - Make it start
+    - Make it log all things to stdout/stderr
+        - let docker handle the log
+    - Make it documented in file
+        - focus on documenting the files and don't worry about size of file
+    - Make it work for others 
+    - Make it lean
+    - Make it scale
+
+Dockerfile Anti-pattern: Trapping Data
+    - Problem: Storing unique data in container
+    - Solution: Define VOLUME for each location
+
+    Ex. Volume /var/lib/mysql
+
+        ENTRYPOINT ["docker-entrypoint.sh"]
+
+        CMD ["mysqld"]
+
+Dockerfile Anti-pattern: Using latest
+    - Latest = Image builds will be meh
+    - Problem: Image builds pull from latest
+    - Solution: Use specific FROM tags
+    - Problem: Image builds install latest packages
+    - Solution: Specify version for critical apt/yum/apk packages
+
+    - When using a specific version name it is easier for other to know what version you are working on
+    - Easier to keep up
+    Ex. FROM php:7.0.24-fpm
+
+        ENV NGINX_VERSION 1.12.1-1~jessie \
+            NJS_VERSION   1.12.1.0.1.10-1~jessie
+
+Dockerfile anti-parrtern: leaving Default config
+    - problem: not changing app defaults, or blindly copying VM config
+        - php.ini, mysql.conf.d, java memory
+    - solution: update default configs via ENV, RUN, and ENTRYPOINT
+    
+    - Do as much ENV settings in dockerfile to increase visbility
+
+The Big 3 Decision
+    Containers-on-VM or Container-ON-Bare-Metal
+        - Do either, or both. Lots of pros/cons to either
+        - Stick with what you know at first
+        - Do some basic performance testing. You will learn lots
+
+OS Linux Distribution/Kernel Matters
+    - Docker is very kernel and storage driver dependent
+    - Innovations/fixes are still happening here
+    - "Minimum" version != "best" version
+    - No pre-exsting opinion? Use Ubuntu 16.04 LTS
+        - Popular, well-tested with Docker
+        - 4.x Kernel and wide stroage driver support
+    Or Infrakit And LinuxKit!
+        - Not the fastest choice if you are not use to it
+    - Get correct Docker for your distro from store.docker.com
+
+Container Base Distribution: Which One?
+    - Which FROM image should you use?
+    - Don't make a decision based on image size (remember it's Single Instance Storage)
+    - Consider changing to Alpine later
+
+Good Defaults: Swarm Architectures
+    - Simple sizing gudelines based off:
+        - Docker internal testing
+        - Docker reference Architectures
+        - Real world deployments
+        - Swarm3k lessons learned
+
+Baby swarm: 1-node
+    - "docker swarm init" done!
+    - Solo VM's do it, so can swarm
+    - Gives you more features then docker run
+
+HA Swarm: 3-Node
+    - Minimum For HA
+    - All Managers
+        - Never use even amount of manager
+    - One node can fail
+    - Use when very small budget
+    - Pet projects or Test/CL
+
+Biz Swarm: 5-node
+    - Better high-availability
+    - All Managers
+    - Two nodes can fail
+    - My minimum for uptime that affects $$$
+
+Flexy Swarm: 10+ nodes
+    - 5 dedicated Managers
+    - Workers in DMZ
+    - Anything beyond 5 nodes, stick with 5 managers and rest Workers
+    - Control container placement with labels + constraints
+
+Don't Turn Cattle into Pets
+    - Assume nodes will be replaced
+    - Assume containers will be recreated
+    - Docker for (AWS/Azure) does this
+    - LinuxKit and Infrakit expect it
+    - Don't use a manager container to do work use a worker container instead
+
+Reasons for multiple swarms
+    Bad Reasons
+        - Different hardware configuration (or OS!)
+        - Different subnets or security groups
+        - Different availability zones
+        - Security boundaries for compliance
+    Good Reasons
+        - Learning: Run Stuff on Test Swarm
+        - Geographical boundaries
+        - Management boundaries using Docker API (or Docker EE RBAC. or other auth plugin)
+
+What About Windows Server 2016 Swarm?
+    - hard to be "windows only swarm", mix with linux nodes
+    - much of those tools are linux only
+    - windows = less choice, but easier path
+    - my recommendation:
+        - manager on linux
+        - reserve Windows for windows-execlusive workload
+
+Outsource Well-Defined Plumbing
+    - Beware the "not implemented here" syndrome
+    - If challenge to implment and maintain
+    - + SaaS/commmercial market is mature
+    - = Opportunities for outsourcing
+
+Outsourcing: For Your Consideration
+    - Image registry
+    - logs
+    - Monitoring and alerting
+    github/cncf/landscape
+
+Production Summary
+    - Trim the optional requirements at first
+    - First, focus on Dockerfile/Docker-compose.yml
+    - Watch out for Dockerfile anti-patterns
+    - Stick with familiar OS and FROM images
+    - Grow swarm as you grow
+    - Find ways to outsource Plumbing
+    - Realize parts of your tech stack may change, stay flexible
+
+Kubernetes:
+    What is Kubernetes:
+        Kubernetes = popular container orchestrator
+        orchestrator = make many servers act like one
+        - Was originally released by google but now is maintain by open-source community
+        - Runs on top of Docker (usually) as a set of APIs in containers
+        - Provides API/CLI to manage containers across servers
+        - Many clouds provide it for you
+        - Many vendors make a distribution of it
+    Why Kubernetes:
+        - Servers + Change Rate = Benefit of Orchestration
+        - If Kubernetes, decide which distribution to use
+            - clud or self-managed (Docker Enterprise, Rancher, OpenShift, Canonical, VMWare Pks)
+        - List of certified Kubernetes distribution
+            - https://kubernetes.io/partners/#conformance
+        - Don't usually need pure upstream
+    Kubernetes vs. Swarm
+        - Kubernetes and Swarm are both container orchestrators
+        - Both are solid platform with vendor backing
+        - Swarm: Easier to deploy/manage
+        - Kubernetes: More features and flexiblity
+        - What's right for you? Understand both and know your requirements
+    Adventages of Swarm:
+        - Comes with Docker, single vender container platform
+        - Easiest orchestrator to deploy/manage yourself
+        - Follows 80/20 rules, 20% of features for 80% of use cases
+        - Runs anywhere Docker does:
+            - Local, cloud, datacenter
+            - ARM, Windows, 32-bitbucket
+        - Secure by default
+        - Easier to troubleshoot
+            - Less moving part
+            - Less to manage
+            - As long as you know how to troubleshoot docker you know how to do swarm
+        - Swarm is best for small or start out
+    Adventages of Kubernetes:
+        - Clouds will deploy/manage Kubernetes for you
+            - Every cloud vendor support Kubernetes
+        - infrastructure vendors are making their own distributions
+        - Widest adoption and community
+        - Flexible: Covers wideset of use cases
+        - "Kubernetes first" vendor support
+        - "No one ever got fired for buying IBM"
+            - You can never go wrong by picking Kubernetes
+            - Trendy, will benefit your career
+            - CIO/CTO checkbox
+        - No other options beside you been told to
+
+Basic Terms: System parts:
+    - Kubernetes: The whole orchestration System
+        - also known as K8s "k-eights" or Kube for short
+    - Kubectl(cube control): CLI to configure Kubernetes and manage apps
+    - Nodes: single server in the kubernetes clustering
+    - Kubelet: Kubernetes agent running on nodes
+        - use to talk to the control plane/master
+    - Control Plane: Set of containers that manage the cluster
+        - Group of container to run one thing really well
+        - Includes API server, scheduler, controller manager, etcd, and more
+        - sometimes called the "master"
+        - control plane in kubernetes mean the master that makes the decision
+        - Worker nodes are usually called node or worker.
+    - Each Master run ontop of Docker
+    - Inside of each master there are multiple container to maintain the system
+        - etcd: distrubted storage system for key values
+        - API: the way you talk to talk to cluster an issue orders
+        - Scheduler: tells how and where the container are placed on the nodes in object called pod
+        - Controller manager: Looks at the state of the whole cluster and figure out how to do what you have asked it to do
+        - Core DNS: Not builtin. 
+        - Networking:
+        - Web:
+    - Inside of node:
+        - Kubelet
+        - Kube-proxy
+
+Docker Desktop
+    - Runs/configures Kubernetes Master container
+    - Manages Kubectl install and certs
+    - Easily install disable, and remove from Docker GUI
+
+Kubernetes Container Abstractions:
+    - Pod: one or more containers running together on one Node
+        - Basic unit of deployment. Containers are always in pods
+    - Controller: for creating/updating pods and other objects
+        - Many types of controllers inc. Deployment, ReplicaSet, SatefulSet, DaemonSet, Job, Cronjob, etc
+    - Service: network endpoint to connect to a pod
+    - Namespace: Filtered group of objects in cluster
+        - Filter for view when you are using kubectl to only see what you want to see
+
+Kubernetes Run, Create, and Apply
+    - Kubernetes is evolving, and so is the CLI
+    - We get three ways to create pods from the kubectl CLI
+        - kubectl run ( changing to be only for pod creation)
+            - closest to docker run
+        - kubectl create (create some resources via CLI or YAML)
+            - similar to docker swarm create
+        - kubectl apply (create/update anything via YAML)
+            - similar to docker stack deploy
+            - Mostly for YAML
+    
+Creating Posd with kubectl
+    - Check of kubectl is working
+        - kubectl version
+    - Two ways to deploy Pods(containers): via commands, or via YAML
+    - Let's run a pod of the nginx web server
+        - kubectl run my-nginx --image nginx
+        - ignore the warning for now(no error for me)
+    - List the pod
+        - kubectl get pods
+
+Pods -> ReplicaSet -> Deployment
+    Job of ReplicaSet
+        - manage and make sure that the number of pod we asked for are running
+        - if you scale the replicas it will ensure all the pod are working
+    Deployment
+        - ensure the replicaset are working
+
+Clean Up Kubernetes
+    kubectl delete <pod/deployment>
+
+kubectl run
+    - command only does one thing: create single pods
+        - it reduce the complexity of how run command worked and move other resource creation to kubectl create
+        - similar to docker run where it creates a single container
+example:
+    kubectl run nginx --image nginx created a Deployment named nginx before 1.18 (which creates a ReplicaSet, which creates a Pod)
+
+    kubectl run nginx --image nginx creates a Pod named nginx in 1.18+
+
+    Creating a Deployment in 1.18: kubectl create deployment nginx --image nginx
+
+Scaling ReplicaSet
+    - kubectl create deployment my-apache --image httpd
+    - kubectl scale deploy/my-apache --replicas 2
+        - Same as
+        - kubectl scale deployment my-apache --replicas 2
+        - deploy = deployment = deployments
+Control plane
+    - deployment updated to 2 replicas
+    - replicaSet controller sets pod count to 2
+    - control plane assigns node to pod
+    - kubelet sees pod is needed starts container
+    * these procedure happens about 2 secs
+
+inspecting deployment objects
+    - kubectl get pods
+    - get container logs
+    - kubectl logs deployment/my-apache --follow --tail 1
+    - get a bunch of details about an object, including events!
+    - kubectl describe pod/my-apaches
+    - pods will be re-create when delete
+    kubectl get pods -w
+        - Watches the activities of the pods
+
+Exposing Containers
+    - kubectl expose creates a service for existing pods
+    - A service is a strable addresss for pod(s)
+    - If we want to connect to pod(s), we need a service
+    - CoreDNS allow us to resolve services by name
+    - There are different types of services
+        - CLusterIP
+        - NodePort
+        - LoadBalancer
+        - ExternalName
+
+Basic Service types:
+    CLusterIP(default) # only good in a cluster
+        - pod talking to another pod
+        - single, internal virtual ip allocated
+        - only reachable from within cluster (nodes and pods)
+        - pods can reach service on apps port number
+    NodePort: (design for something outside of the cluster)
+        - high port allocated on each node
+        - cant use port 80
+        - anyone can connect (if they can reach node)
+        - other pods need to be updated to this port
+    - These services are always available in kubernetes
+
+    LoadBalancer:
+        - Controls a lb endpoint external to the cluster
+        - Only available when infrastructure provider gives you a lb (AWS ELB, etc)
+        - Creates NodePort+CLusterIP services, tells LB to send to NodePort
+        - Only for traffic coming into the cluster from outside sources and requires a infrastructure to talk to kubernetes
+    ExternalName:
+        - Adds CNAME DNS record to CoreDNS only
+        - Not used for Pods, but for giving pods a DNS name to use for something outside Kubernetes
+        - Usually don't need
+    Kubernetes Ingress:
+        - for httpd services
+
+Creating a CLusterIP Service
+    - kubectl create deployment httpenv --image=bretfisher/httpenv
+    - kubectl scale deployment/httpenv --replicas=5
+    - kubectl expose deployment/httpenv --port 8888
+    Look up what ip was allocated
+        - kubectl get service
+        - this ip is cluster internal only
+    - kubectl run --generator=run-pod/v1 tmp-shell --rm -it --image bretfisher/netshoot -- bash
+        - --generator is removed(in the current version)
+        - generator is a type of template
+        - pick a pod template call it tmp-shell
+        - (--rm) remove it when it is not used
+        - (-it) give you a shell to type in
+        - (--) tell it to run the next command which in this case is bash
+    - curl httpenv:8888
+Creating a NodePort
+    default port range from 30000-32767
+    - kubectl expose deployment/httpenv --port 8888 --name httpenv-np --type NodePort
+    - NodePort service also creates a CLusterIP
+    - These three service types are additive, each one creates the one above it:
+        - ClusterIP
+        - NodePort
+        - LoadBalancer
+Add a LoadBalancer Service
+    - If you're on docker desktop, it provides a built-in LoadBalancer that publisjes the --port on localhost
+        -  kubectl expose deployment/httpenv --port 8888 --name httpenv-lb --type LoadBalancer
+
+Kubernetes Services DNS
+    - Starting with 1.11,  internal DNS is using CoreDNS
+    - Like Swarm, this is DNS-Based Service Discovery
+    - So far we've been using hostnames to access service
+        - curl <hostname>
+    - But that only works for services in the same Namespace
+    - kubectl get namespaces
+    - Services also have a FQDN
+        - curl <hostname>.<namespace>.svc.cluster.local
+
+Run, Create, and Expose Generators
+    - These commands use helper templates called "generators"
+    - Every resouce in Kubernetes has a specification or "spec"
+        - kubectl create deployment sample --image nginx --dry-run -o yaml
+    You can output those templates with --dry-run -o yaml
+
+Generator Examples
+    - Using dry-run with yaml output we can see the generators
+        - kubectl create deployment test --image nginx --dry-run -o yaml
+        - kubectl create job test --image nginx --dry-run -o yaml
+        - kubectl expose deployment/test --port 80 --dry-run -o yaml
+            - You need the deployment to exist before you can expose the port
+            - you can just create a deployment without the dry-run like the following:
+                kubectl create deployment test --image nginx
+Kubectl run
+    - The goal is to reduce its features to only create Pods
+    - the idea is to make it easy like docker run for one-off tasks
+    - Not recommended for production
+    - use for simple dev/test or troubleshooting pods
+
+Old Run Confusion(not working)
+    - The generators activate different Controllers based on options
+    - Using dry-run we can see which generators are used
+        - kubectl run test --image nginx --dry-run
+            create a deployment
+        - kubectl run test --image nginx --port --expose --dry-run
+            create a deployment and service resources
+        - kubectl run test --image nginx --restart OnFailure --dry-run
+        - kubectl run test --image nginx --restart Never --dry-run
+            - This is on by default now
+        - kubectl run test --image nginx --schedule "*1 * * *" --dry-run
+
+kubectl run only runs pods as of now
+
+Imperative vs. Declarative
+    - Imperative: Focus on how a program operates
+    - Declarative: Focus on what a program should accomplish
+    Example: "I'd like a cup of coffee"
+    Imperative: I boil water, scoop out 42 grams of medium-fine grounds, poor over 700 grams of water, etc
+    Declarative: "Barista, I'd like a cup of coffee" (Barista is the engine that works through the steps including retrying to make a cup, and is only finished when I have a cup)
+
+Kubernetes Imperative
+    - examples: kubectl run , kubectl create deployment, kubectl update
+        - we start with a state we know (no deployment exists)
+        - we ask kubect run to create a deployment
+    - different commands are required to change that deployment
+    - different commands are required per object
+    - imperative is easier when you know the state
+    - Imperative is easier to get started
+    - Not easy to automate
+    - Things you can do step by step without automation
+
+Kubernetes Decarative:
+    - You don't know the current state of it 
+    - Example: kubectl apply -f my-resources.yaml
+    - We only know what we want the end result to be (yaml contents)
+    - same command each time (tiny exception for delete)
+    - resources can be all in a file, or many files (apply a whole dir)
+    - Requires understanding the YAML keys and values
+    - More work than kubectl run for just starting a pod
+    - the easiest way to automate
+    - the eventual path to GitOps
+
+Three Management Approaches
+    - Imperative commands: run , expose , scale, edit, create deployment
+        - Best for dev/learning /personal projects
+        - easy to learn, hardest to manage over time
+    - Imperative onjects: create -f file.yml, replace -f file.yml, delete
+        - Good for prod of small environments, single file per command
+        - Store your changes in git-based yaml files
+        - Hard to automate
+    - Declarative objects: apply -f file.yml or dir\, diff
+        - Best for prod, easier to automate
+        - Harder to undeerstand and predict changes
+    Most Important Rules:
+        - Don't mix the three Approaches
+        - try to get used to apply as soon as you can
+        - and use git log to see changes
+        - If the product is for production never use run and think yaml
+    Bret's recommendations:
+        - learn the imperative CLI for easy control of local and test setups
+        - move to apply -f file.yml and apply -f directory\ for prod
+        - Store yaml in git, git commit each change before you apply
+        - This train syou for later doing GitOps (where git commits are automatically applied to clusters)
